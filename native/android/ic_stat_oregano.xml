@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Kleines weißes Oregano-Blatt für die Statusleiste (Android färbt es selbst ein). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="1" android:strokeLineCap="round"
+        android:pathData="M11.6,20.2 C11.6,16.5 11.8,12 12.3,7.5"/>
+    <group android:pivotX="8.25" android:pivotY="15.4" android:rotation="-38">
+        <path android:fillColor="#FFFFFF" android:pathData="M4.85,15.4 a3.4,1.9 0 1,0 6.8,0 a3.4,1.9 0 1,0 -6.8,0"/>
+    </group>
+    <group android:pivotX="16.1" android:pivotY="14.6" android:rotation="38">
+        <path android:fillColor="#FFFFFF" android:pathData="M12.7,14.6 a3.4,1.9 0 1,0 6.8,0 a3.4,1.9 0 1,0 -6.8,0"/>
+    </group>
+    <group android:pivotX="8.6" android:pivotY="10.5" android:rotation="-38">
+        <path android:fillColor="#FFFFFF" android:pathData="M5.6,10.5 a3,1.65 0 1,0 6,0 a3,1.65 0 1,0 -6,0"/>
+    </group>
+    <group android:pivotX="15.75" android:pivotY="9.75" android:rotation="38">
+        <path android:fillColor="#FFFFFF" android:pathData="M12.75,9.75 a3,1.65 0 1,0 6,0 a3,1.65 0 1,0 -6,0"/>
+    </group>
+    <group android:pivotX="12.4" android:pivotY="5.25" android:rotation="8">
+        <path android:fillColor="#FFFFFF" android:pathData="M10.8,5.25 a1.6,2.8 0 1,0 3.2,0 a1.6,2.8 0 1,0 -3.2,0"/>
+    </group>
+</vector>

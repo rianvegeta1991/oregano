@@ -1,0 +1,8 @@
+node_modules/
+/android/
+/ios/
+www/capacitor.js
+*.apk
+*.aab
+.DS_Store
+Thumbs.db

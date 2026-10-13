@@ -1,0 +1,20 @@
+{
+  "appId": "io.github.rianvegeta1991.oregano",
+  "appName": "Oregano",
+  "webDir": "www",
+  "backgroundColor": "#f4f6f4",
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_oregano",
+      "iconColor": "#2E7D32",
+      "sound": "oregano.wav"
+    },
+    "SplashScreen": {
+      "launchShowDuration": 900,
+      "launchAutoHide": true,
+      "backgroundColor": "#f4f6f4",
+      "androidScaleType": "CENTER_INSIDE",
+      "showSpinner": false
+    }
+  }
+}

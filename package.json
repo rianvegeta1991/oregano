@@ -1,0 +1,30 @@
+{
+  "name": "oregano",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Oregano – Organizer für ToDos, Kalender, Kanban-Board und Listen (PWA + Capacitor-App)",
+  "license": "MIT",
+  "scripts": {
+    "serve": "powershell -NoProfile -ExecutionPolicy Bypass -File serve.ps1",
+    "kontrast": "python tools/kontrast.py",
+    "cap:assets": "capacitor-assets generate --android --assetPath assets",
+    "cap:sync": "cap sync",
+    "android:add": "cap add android",
+    "android:open": "cap open android",
+    "ios:add": "cap add ios",
+    "ios:open": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/filesystem": "^7.0.0",
+    "@capacitor/ios": "^7.0.0",
+    "@capacitor/local-notifications": "^7.0.0",
+    "@capacitor/share": "^7.0.0",
+    "@capacitor/splash-screen": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.0.0"
+  }
+}

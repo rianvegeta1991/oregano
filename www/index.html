@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="de" data-theme="hell">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Oregano</title>
+  <meta name="description" content="Oregano – Organizer für ToDos, Kalender, Kanban-Board und Listen. Offline nutzbar.">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Oregano">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/themes.css">
+  <link rel="stylesheet" href="css/app.css">
+  <script>
+    // Theme vor dem ersten Zeichnen setzen (die Einstellungen selbst liegen in IndexedDB und kommen später).
+    try {
+      var t = JSON.parse(localStorage.getItem('oregano-theme') || 'null');
+      if (t) {
+        var id = t.follow ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dunkel' : 'hell') : t.theme;
+        document.documentElement.setAttribute('data-theme', id);
+      } else if (matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.setAttribute('data-theme', 'dunkel');
+      }
+    } catch (e) {}
+    // Installations-Dialog früh abfangen – Chrome feuert ihn teils vor dem Hauptskript.
+    window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__installPrompt = e; });
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#view">Zum Inhalt springen</a>
+
+  <div id="splash" aria-hidden="true">
+    <svg viewBox="0 0 64 64" width="96" height="96">
+      <rect width="64" height="64" rx="14" fill="#2e7d32"/>
+      <g fill="#f4fbf4">
+        <path d="M31 54c0-10 .6-22 1.8-34" stroke="#f4fbf4" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+        <ellipse cx="22" cy="41" rx="9" ry="5" transform="rotate(-38 22 41)"/>
+        <ellipse cx="43" cy="39" rx="9" ry="5" transform="rotate(38 43 39)"/>
+        <ellipse cx="23" cy="28" rx="8" ry="4.4" transform="rotate(-38 23 28)"/>
+        <ellipse cx="42" cy="26" rx="8" ry="4.4" transform="rotate(38 42 26)"/>
+        <ellipse cx="33" cy="14" rx="4.2" ry="7.5" transform="rotate(8 33 14)"/>
+      </g>
+    </svg>
+    <div class="splash-name">Oregano</div>
+  </div>
+
+  <div id="app">
+    <aside id="sidebar" class="sidebar"></aside>
+    <div id="main-col">
+      <header id="topbar" class="topbar"></header>
+      <main id="view" tabindex="-1" aria-label="Inhalt"></main>
+    </div>
+    <nav id="bottomnav" class="bottomnav" aria-label="Hauptnavigation"></nav>
+    <button id="fab" class="fab" type="button" aria-label="Neues Element"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+  </div>
+
+  <div id="overlay-root"></div>
+  <div id="toast-root" aria-live="polite"></div>
+  <noscript><p style="padding:2rem;font-family:sans-serif">Oregano braucht JavaScript.</p></noscript>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
