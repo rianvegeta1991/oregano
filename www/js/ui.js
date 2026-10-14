@@ -214,23 +214,84 @@ export function dateField({ value = '', label, onChange }) {
   };
 }
 
-const TIME_LIST_ID = 'oregano-times';
-function ensureTimeList() {
-  if (document.getElementById(TIME_LIST_ID)) return;
-  const dl = h('datalist', { id: TIME_LIST_ID });
-  for (let m = 0; m < 1440; m += 30) dl.append(h('option', { value: `${pad(Math.floor(m / 60))}:${pad(m % 60)}` }));
-  document.body.append(dl);
-}
-/** Textfeld „HH:MM“ (immer 24 h). get(): '' | 'HH:mm' | null (ungültig). */
+const TIMES = Array.from({ length: 48 }, (_, i) => `${pad(Math.floor(i / 2))}:${i % 2 ? '30' : '00'}`);
+const toMin = (t) => +t.slice(0, 2) * 60 + +t.slice(3, 5);
+
+/** Textfeld „HH:MM“ (immer 24 h). Beim Antippen klappt eine Vorschlagsliste (30-Minuten-Raster) auf;
+ *  Tippen filtert sie, eigene Werte wie „9:17“ gehen weiterhin. get(): '' | 'HH:mm' | null (ungültig). */
 export function timeField({ value = '', label, onChange }) {
-  ensureTimeList();
-  const input = h('input', { type: 'text', inputmode: 'numeric', class: 'dtf-input time', placeholder: 'HH:MM', list: TIME_LIST_ID,
-    autocomplete: 'off', 'aria-label': label, value });
+  const listId = 'tf-' + uid().slice(0, 6);
+  const input = h('input', { type: 'text', inputmode: 'numeric', class: 'dtf-input time', placeholder: 'HH:MM', autocomplete: 'off',
+    role: 'combobox', 'aria-autocomplete': 'list', 'aria-expanded': 'false', 'aria-controls': listId, 'aria-label': label, value });
+  const list = h('ul', { class: 'cb-list tf-list', role: 'listbox', id: listId, hidden: true });
+  const el = h('div', { class: 'dtf tf' }, input, list);
+  let shown = [], active = -1;
+
   const validate = () => { const v = parseTimeInput(input.value); input.classList.toggle('invalid', v === null); input.setAttribute('aria-invalid', v === null ? 'true' : 'false'); return v; };
-  input.addEventListener('input', () => { validate(); onChange?.(); });
+  const keep = (i) => {
+    const li = list.children[i]; if (!li) return;
+    if (li.offsetTop < list.scrollTop) list.scrollTop = li.offsetTop;
+    else if (li.offsetTop + li.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = li.offsetTop + li.offsetHeight - list.clientHeight;
+  };
+  const setActive = (i, center) => {
+    active = i;
+    [...list.children].forEach((li, n) => { li.classList.toggle('active', n === i); li.setAttribute('aria-selected', String(n === i)); });
+    if (i >= 0) {
+      input.setAttribute('aria-activedescendant', `${listId}-${i}`);
+      if (center) list.scrollTop = Math.max(0, list.children[i].offsetTop - list.clientHeight / 2 + list.children[i].offsetHeight / 2); else keep(i);
+    } else input.removeAttribute('aria-activedescendant');
+  };
+  const place = () => {
+    const r = input.getBoundingClientRect();
+    const vv = window.visualViewport;
+    const top = vv ? vv.offsetTop : 0, bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;   // Tastatur abziehen
+    const below = bottom - r.bottom, above = r.top - top;
+    const up = below < 170 && above > below;
+    Object.assign(list.style, {
+      left: r.left + 'px', width: Math.max(r.width, 110) + 'px',
+      top: up ? 'auto' : r.bottom + 2 + 'px', bottom: up ? window.innerHeight - r.top + 2 + 'px' : 'auto',
+      maxHeight: Math.max(110, Math.min(240, (up ? above : below) - 10)) + 'px',
+    });
+  };
+  const render = () => {
+    const raw = input.value.trim();
+    const cur = parseTimeInput(raw);
+    // Ein vollständig geschriebener Wert (HH:MM) zeigt die ganze Liste (Auswahl springt an die passende Stelle) – sonst wird gefiltert
+    const q = cur && /^\d{2}:\d{2}$/.test(raw) ? '' : raw.replace(/\s/g, '');
+    shown = q ? TIMES.filter((t) => t.startsWith(q) || t.replace(/^0/, '').startsWith(q) || t.replace(':', '').startsWith(q)) : TIMES;
+    list.replaceChildren(...shown.map((t, i) => h('li', { role: 'option', id: `${listId}-${i}`, class: 'cb-opt tf-opt', 'aria-selected': 'false',
+      onmousedown: (e) => e.preventDefault(), onclick: () => choose(t) }, t)));
+    if (!shown.length) { list.hidden = true; input.setAttribute('aria-expanded', 'false'); return; }
+    list.hidden = false; input.setAttribute('aria-expanded', 'true');
+    place();
+    let idx = 0;
+    if (!q) {
+      const target = cur ? toMin(cur) : 9 * 60;
+      idx = shown.reduce((best, t, i) => (Math.abs(toMin(t) - target) < Math.abs(toMin(shown[best]) - target) ? i : best), 0);
+    }
+    setActive(idx, !q);
+  };
+  const close = () => { list.hidden = true; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); };
+  const choose = (t) => { input.value = t; validate(); close(); onChange?.(); input.focus({ preventScroll: true }); };
+
+  input.addEventListener('focus', () => { input.select(); render(); });
+  input.addEventListener('click', () => { if (list.hidden) render(); });
+  input.addEventListener('input', () => { validate(); render(); onChange?.(); });
   input.addEventListener('change', () => { const v = validate(); if (v) input.value = v; onChange?.(); });
-  input.addEventListener('blur', () => { const v = validate(); if (v) input.value = v; });
-  return { el: h('div', { class: 'dtf tf' }, input), input, get: () => parseTimeInput(input.value), set(v) { input.value = v || ''; validate(); } };
+  input.addEventListener('blur', () => { const v = validate(); if (v) input.value = v; setTimeout(close, 0); });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (list.hidden) render(); else setActive(Math.min(shown.length - 1, active + 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); if (!list.hidden) setActive(Math.max(0, active - 1)); }
+    else if (e.key === 'Enter' && !list.hidden && active >= 0) {
+      // Ist schon eine eigene, gültige Zeit eingetippt (z. B. 9:17), gilt die – sonst der markierte Vorschlag
+      if (parseTimeInput(input.value) && !shown.includes(parseTimeInput(input.value))) { close(); return; }
+      e.preventDefault(); choose(shown[active]);
+    } else if (e.key === 'Escape' && !list.hidden) { e.preventDefault(); e.stopPropagation(); close(); }
+  });
+  addEventListener('resize', () => { if (!list.hidden) place(); });
+  window.visualViewport?.addEventListener('resize', () => { if (!list.hidden) place(); });
+  document.addEventListener('scroll', () => { if (!list.hidden) place(); }, true);
+  return { el, input, get: () => parseTimeInput(input.value), set(v) { input.value = v || ''; validate(); } };
 }
 
 /** Kleines Aktionsmenü an einem Anker (⋯-Knopf). items: [{label, icon, onClick, danger}] */

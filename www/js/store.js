@@ -45,6 +45,8 @@ export const DEFAULT_SETTINGS = {
   showDone: true,            // Erledigtes im Kalender zeigen (ausgegraut)
   calView: 'month',
   calSidebar: true,
+  calZoom: 1,               // Zoom des Zeitrasters (Tag/Woche)
+  boardZoom: 1,             // Zoom des Boards
   overview: { cat: '', prio: '', status: 'open', due: '', sort: 'end', dir: 'asc' },
   collapsedLanes: {},
   lastList: '',

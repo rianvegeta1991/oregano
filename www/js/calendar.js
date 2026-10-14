@@ -9,10 +9,14 @@ import {
 import { icon, prioIcon } from './icons.js';
 import { makeDraggable } from './dnd.js';
 import { openModal, segmented } from './ui.js';
+import { debounce } from './util.js';
 import { state, patchSettings, updateItem, getCategory, PRIO_LEVEL } from './store.js';
 import { openItemDialog } from './itemdialog.js';
 
-const HH = 52;                       // Stundenhöhe im Zeitraster (px)
+const BASE_HH = 52;                  // Stundenhöhe im Zeitraster bei Zoom 1 (px)
+const BASE_COL = 96;                 // Mindestbreite einer Wochenspalte bei Zoom 1 (px)
+const Z_MIN = 0.32, Z_MAX = 2.4;
+let HH = BASE_HH;                    // aktuelle Stundenhöhe (folgt dem Zoom)
 const SNAP = 15;                     // Minuten
 const isNarrow = () => window.innerWidth < 760;
 
@@ -89,6 +93,50 @@ export const calendarView = {
     const titleEl = h('h2', { class: 'cal-title', 'aria-live': 'polite' });
     const viewSeg = segmented({ name: 'calview', label: 'Ansicht', value: view, options: [{ id: 'day', label: 'Tag' }, { id: 'week', label: 'Woche' }, { id: 'month', label: 'Monat' }],
       onChange: (v) => { view = v; patchSettings({ calView: v }); render(); } });
+    // --- Zoom (Tag/Woche): +/−, Anpassen, Zwei-Finger-Geste, Strg+Mausrad
+    let zoom = clamp(+state.settings.calZoom || 1, Z_MIN, Z_MAX);
+    const zbtn = (label, ico, fn) => h('button', { class: 'btn icon', type: 'button', 'aria-label': label, title: label, onclick: fn }, icon(ico, { size: 18 }));
+    const zoomGroup = h('div', { class: 'zoom-group', role: 'group', 'aria-label': 'Zoom' },
+      zbtn('Verkleinern', 'minus', () => zoomBy(1 / 1.25)), zbtn('Vergrößern', 'plus', () => zoomBy(1.25)), zbtn('Ganze Woche anpassen', 'fit', () => zoomFit()));
+    const colMinFor = (z) => (view === 'week' ? Math.max(30, Math.round(BASE_COL * z)) : 0);
+    function applyZoomVars(wrap) {
+      HH = Math.max(18, BASE_HH * zoom);
+      const cm = colMinFor(zoom);
+      wrap.style.setProperty('--hh', HH + 'px');
+      wrap.style.setProperty('--colmin', cm + 'px');
+      wrap.style.setProperty('--zf', String(clamp(zoom, 0.62, 1)));
+      wrap.dataset.narrow = view === 'week' && cm < 66 ? '1' : '';
+    }
+    /** Setzt den Zoom live (nur CSS-Variablen) und hält den Punkt unter dem Finger/Cursor an Ort und Stelle. */
+    function setZoom(z, fx, fy, persist = false) {
+      z = clamp(z, Z_MIN, Z_MAX);
+      const tg = main.querySelector('.tg');
+      if (!tg) { zoom = z; return; }
+      const rect = tg.getBoundingClientRect();
+      const oldH = HH, oldC = colMinFor(zoom);
+      const T = tg.querySelector('.tg-top').offsetHeight, G = tg.querySelector('.tg-gutter').offsetWidth;
+      const cx = (fx ?? rect.left + rect.width / 2) - rect.left, cy = (fy ?? rect.top + rect.height / 2) - rect.top;
+      zoom = z;
+      applyZoomVars(tg);
+      const ry = HH / oldH, rx = oldC ? colMinFor(zoom) / oldC : 1;
+      tg.scrollTop = (tg.scrollTop + cy - T) * ry + T - cy;
+      if (view === 'week') tg.scrollLeft = (tg.scrollLeft + cx - G) * rx + G - cx;
+      if (persist) saveZoom();
+    }
+    const saveZoom = debounce(() => patchSettings({ calZoom: Math.round(zoom * 100) / 100 }), 250);
+    const zoomBy = (f) => { setZoom(zoom * f, undefined, undefined, true); };
+    function zoomFit() {
+      const tg = main.querySelector('.tg'); if (!tg) return;
+      if (view === 'week') {
+        const avail = tg.clientWidth - tg.querySelector('.tg-gutter').offsetWidth;
+        setZoom(avail / 7 / BASE_COL, undefined, undefined, true);
+        tg.scrollLeft = 0;
+      } else {                                        // Tag: ganze 24 Stunden untereinander
+        const avail = tg.clientHeight - tg.querySelector('.tg-top').offsetHeight;
+        setZoom(avail / 24 / BASE_HH, undefined, undefined, true);
+        tg.scrollTop = 0;
+      }
+    }
     const unschedBtn = h('button', { class: 'btn', type: 'button', onclick: () => (isNarrow() ? openUnscheduledSheet() : patchSettings({ calSidebar: !state.settings.calSidebar })) });
     const bar = h('div', { class: 'cal-bar' },
       h('div', { class: 'cal-nav' },
@@ -96,10 +144,32 @@ export const calendarView = {
         h('button', { class: 'btn icon', type: 'button', 'aria-label': 'Zurück', onclick: () => step(-1) }, icon('chevL')),
         h('button', { class: 'btn icon', type: 'button', 'aria-label': 'Vor', onclick: () => step(1) }, icon('chevR')),
         titleEl),
-      h('div', { class: 'cal-tools' }, viewSeg.el, unschedBtn));
+      h('div', { class: 'cal-tools' }, zoomGroup, viewSeg.el, unschedBtn));
     const main = h('div', { class: 'cal-main' });
     const side = h('aside', { class: 'cal-side', 'aria-label': 'Ohne Termin' });
     root.append(bar, h('div', { class: 'cal-layout' }, main, side));
+
+    let pinch = null;
+    const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    main.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2 && e.target.closest('.tg')) pinch = { d0: dist(e.touches[0], e.touches[1]), z0: zoom };
+      else if (e.touches.length > 2) pinch = null;
+    }, { passive: true });
+    main.addEventListener('touchmove', (e) => {
+      if (!pinch || e.touches.length !== 2) return;
+      if (e.cancelable) e.preventDefault();
+      const [a, b] = e.touches;
+      setZoom(pinch.z0 * dist(a, b) / pinch.d0, (a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+    }, { passive: false });
+    const endPinch = (e) => { if (pinch && e.touches.length < 2) { pinch = null; saveZoom(); } };
+    main.addEventListener('touchend', endPinch, { passive: true });
+    main.addEventListener('touchcancel', endPinch, { passive: true });
+    main.addEventListener('wheel', (e) => {            // Strg + Mausrad bzw. Trackpad-Pinch am Desktop
+      if (!e.ctrlKey || !e.target.closest('.tg')) return;
+      e.preventDefault();
+      setZoom(zoom * Math.exp(-e.deltaY * 0.01), e.clientX, e.clientY, true);
+    }, { passive: false });
+
 
     function step(dir) {
       cursor = view === 'month' ? addMonths(cursor, dir) : addDays(cursor, dir * (view === 'week' ? 7 : 1));
@@ -201,9 +271,9 @@ export const calendarView = {
       const banners = spans.filter((s) => s.banner);
       const timed = spans.filter((s) => !s.banner);
       const { bars, lanes } = layoutBars(banners, first, n);
-      const colw = view === 'week' ? 'minmax(96px, 1fr)' : 'minmax(220px, 1fr)';
-      const cols = `var(--gutter) repeat(${n}, ${colw})`;
-      const wrap = h('div', { class: 'tg', style: { '--hh': HH + 'px', '--cols': cols, '--minw': view === 'week' ? 'calc(var(--gutter) + 7 * 96px)' : '0px' } });
+      const cols = `var(--gutter) repeat(${n}, minmax(var(--colmin), 1fr))`;
+      const wrap = h('div', { class: 'tg', style: { '--cols': cols, '--minw': 'calc(var(--gutter) + ' + n + ' * var(--colmin))' } });
+      applyZoomVars(wrap);
 
       const head = h('div', { class: 'tg-row tg-headrow' }, h('div', { class: 'tg-gutter kw-cell' }, view === 'week' && state.settings.weekNumbers ? `KW ${isoWeek(first)}` : ''),
         days.map((d) => h('div', { class: `tg-dayhead ${sameDay(d, today) ? 'today' : ''} ${d.getDay() === 0 || d.getDay() === 6 ? 'weekend' : ''}` },
@@ -253,13 +323,14 @@ export const calendarView = {
 
     function evEl(e, day) {
       const it = e.it;
-      const top = (e.ca - day.getTime()) / MIN * HH / 60;
-      const hgt = Math.max(22, (e.cb - e.ca) / MIN * HH / 60 - 1);
+      const topH = (e.ca - day.getTime()) / MIN / 60;               // Stunden ab Mitternacht – die Pixel macht CSS (--hh), so zoomt es ohne Neuaufbau
+      const durH = (e.cb - e.ca) / MIN / 60;
+      const hgt = Math.max(22, durH * HH - 1);
       const w = 100 / e.cols;
       const startT = fmtTime(new Date(e.a)), endT = e.kind === 'start' ? '' : fmtTime(new Date(e.b));
       const el = h('div', {
         class: `ev ${it.status === 'done' ? 'done' : ''} ${it.priority ? 'p-' + it.priority : ''} ${hgt < 36 ? 'tiny' : ''}`, role: 'button', tabindex: '0', dataset: { id: it.id },
-        style: { top: top + 'px', height: hgt + 'px', left: `calc(${e.col * w}% + 1px)`, width: `calc(${w}% - 3px)`, ...catStyle(it) },
+        style: { top: `calc(${topH} * var(--hh))`, height: `max(22px, calc(${durH} * var(--hh) - 1px))`, left: `calc(${e.col * w}% + 1px)`, width: `calc(${w}% - 3px)`, ...catStyle(it) },
         'aria-label': `${titleOf(it.text)}, ${startT}${endT ? ' bis ' + endT : ''}`,
       }, h('div', { class: 'ev-time' }, it.priority ? prioIcon(PRIO_LEVEL[it.priority], { size: 12 }) : null, endT ? `${startT}–${endT}` : startT),
       h('div', { class: 'ev-title' }, titleOf(it.text)),
@@ -301,8 +372,8 @@ export const calendarView = {
       const minutes = clamp(t.minutes, 0, 1440 - Math.min(durMin, 1440));
       preview ||= h('div', { class: 'ev-preview' });
       if (preview.parentNode !== t.el) t.el.append(preview);
-      preview.style.top = minutes / 60 * HH + 'px';
-      preview.style.height = Math.max(22, durMin / 60 * HH) + 'px';
+      preview.style.top = `calc(${minutes / 60} * var(--hh))`;
+      preview.style.height = `max(22px, calc(${durMin / 60} * var(--hh)))`;
       preview.textContent = label(minutes);
       t.minutes = minutes;
     }
@@ -363,7 +434,7 @@ export const calendarView = {
         const idx = days.findIndex((d) => sameDay(d, now));
         if (idx < 0) return;
         const col = wrap.querySelectorAll('.tg-col')[idx];
-        col?.append(h('div', { class: 'now-line', style: { top: (now.getHours() * 60 + now.getMinutes()) / 60 * HH + 'px' } }));
+        col?.append(h('div', { class: 'now-line', style: { top: `calc(${(now.getHours() * 60 + now.getMinutes()) / 60} * var(--hh))` } }));
       };
       draw();
       nowTimer = setInterval(draw, 60000);
@@ -441,6 +512,8 @@ export const calendarView = {
       setTitle();
       root.dataset.view = view;
       viewSeg.set(view);
+      zoomGroup.hidden = view === 'month';
+      zoom = clamp(+state.settings.calZoom || zoom, Z_MIN, Z_MAX);
       if (view === 'month') { clearInterval(nowTimer); renderMonth(); } else renderGrid();
       renderSide();
       if (view !== 'month') {

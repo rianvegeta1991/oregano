@@ -18,6 +18,9 @@ Organizer für **ToDos, Kalender, Kanban-Board und Listen** – offline-first, a
 | **Suche** | über Elemente und Listeneinträge – `/` oder `Strg+K` |
 | **Themes** | Hell · Dunkel · Beige · Pastellblau · Cyberpunk · Bauhaus, dazu „System folgen“ |
 
+Zoom: im Kalender (Tag/Woche) und im Board per Zwei-Finger-Geste, `+`/`−` oder `Strg` + Mausrad; der Knopf „Anpassen“ zeigt die ganze Woche bzw. alle vier Board-Spalten auf einen Blick.
+Uhrzeitfelder schlagen beim Antippen Zeiten im 30-Minuten-Raster vor – eigene Eingaben wie `9:17` gehen weiterhin.
+
 Tastatur: `n` neues Element, `/` Suche. Im Board verschiebt `Alt` + Pfeiltasten die fokussierte Karte.
 Format: de-DE, Wochenbeginn Montag, 24-Stunden-Zeit.
 

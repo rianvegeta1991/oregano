@@ -2,7 +2,7 @@
 // Karte ziehen: zwischen Spalten ändert den Status, zwischen Swimlanes die Kategorie.
 // Tastatur: Karte fokussieren, Alt + Pfeile verschiebt (←/→ Status, ↑/↓ Swimlane).
 
-import { h, titleOf } from './util.js';
+import { h, titleOf, clamp, debounce } from './util.js';
 import { icon, prioIcon } from './icons.js';
 import { makeDraggable } from './dnd.js';
 import {
@@ -22,6 +22,45 @@ export const boardView = {
     const root = h('div', { class: 'view board' });
     host.append(root);
     const scrollerEl = () => host.closest('#view') || host;
+
+    // --- Zoom: +/−, „Alles auf einen Blick“, Zwei-Finger-Geste. Wirkt über CSS-Variablen (kein Neuaufbau).
+    const BZ_MIN = 0.25, BZ_MAX = 1.8;
+    let zoom = clamp(+state.settings.boardZoom || 1, BZ_MIN, BZ_MAX);
+    const applyZoom = () => {
+      root.style.setProperty('--bz', zoom);
+      root.style.setProperty('--bzc', clamp(zoom, 0.55, BZ_MAX));   // Schrift/Karten werden nie ganz unlesbar klein
+    };
+    const saveZoom = debounce(() => patchSettings({ boardZoom: Math.round(zoom * 100) / 100 }), 250);
+    const setZoom = (z, persist = false) => { zoom = clamp(z, BZ_MIN, BZ_MAX); applyZoom(); if (persist) saveZoom(); };
+    const fit = () => {                                   // Handy: alle vier Spalten nebeneinander; Desktop: Normalgröße
+      const w = root.querySelector('.board-scroll')?.clientWidth || root.clientWidth;
+      setZoom(window.innerWidth < 860 ? ((w - 3 * 9.6) / 4) / (0.8 * w) : 1, true);
+    };
+    const zbtn = (label, ico, fn) => h('button', { class: 'btn icon', type: 'button', 'aria-label': label, title: label, onclick: fn }, icon(ico, { size: 18 }));
+    const tools = h('div', { class: 'board-tools', role: 'group', 'aria-label': 'Zoom' },
+      h('span', { class: 'hint hide-xs' }, 'Zwei Finger zum Zoomen'),
+      zbtn('Verkleinern', 'minus', () => setZoom(zoom / 1.25, true)), zbtn('Vergrößern', 'plus', () => setZoom(zoom * 1.25, true)),
+      zbtn('Alle Spalten auf einen Blick', 'fit', fit));
+    let pinch = null;
+    const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    root.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2 && e.target.closest('.board-scroll')) pinch = { d0: dist(e.touches[0], e.touches[1]), z0: zoom };
+      else if (e.touches.length > 2) pinch = null;
+    }, { passive: true });
+    root.addEventListener('touchmove', (e) => {
+      if (!pinch || e.touches.length !== 2) return;
+      if (e.cancelable) e.preventDefault();
+      setZoom(pinch.z0 * dist(e.touches[0], e.touches[1]) / pinch.d0);
+    }, { passive: false });
+    const endPinch = (e) => { if (pinch && e.touches.length < 2) { pinch = null; saveZoom(); } };
+    root.addEventListener('touchend', endPinch, { passive: true });
+    root.addEventListener('touchcancel', endPinch, { passive: true });
+    root.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey || !e.target.closest('.board-scroll')) return;
+      e.preventDefault();
+      setZoom(zoom * Math.exp(-e.deltaY * 0.01), true);
+    }, { passive: false });
+    applyZoom();
 
     const lanes = () => [
       ...state.categories.map((c) => ({ id: c.id, name: c.name, color: c.color, cat: c })),
@@ -136,6 +175,7 @@ export const boardView = {
       };
       const L = lanes();
       root.replaceChildren(
+        tools,
         h('div', { class: 'board-scroll' },
           h('div', { class: 'board-grid' },
             h('div', { class: 'board-cols', 'aria-hidden': 'true' }, STATUSES.map((s) => h('div', { class: `col-title st-${s.id}` }, s.label,

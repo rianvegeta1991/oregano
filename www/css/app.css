@@ -575,3 +575,33 @@ mark { background: var(--accent-soft); color: var(--accent-text); border-radius:
 
 /* Die Prioritätsfarbe am linken Rand darf von den Theme-Rahmenfarben oben nicht überschrieben werden */
 [data-theme="cyberpunk"] .card, [data-theme="cyberpunk"] .todo-row, [data-theme="pastell"] .card, [data-theme="pastell"] .todo-row { border-left-color: var(--prio, var(--border)); }
+
+/* ---------------------------------------------------------------- Zoom (Kalender-Zeitraster, Board) */
+.zoom-group { display: inline-flex; gap: .25rem; }
+.tg { touch-action: pan-x pan-y; }            /* Zwei-Finger-Zoom der Seite aus, damit unsere Geste ankommt */
+.tg .ev { font-size: calc(.76rem * var(--zf, 1)); }
+.tg[data-narrow="1"] { --gutter: 2.3rem; }
+.tg[data-narrow="1"] .hr { font-size: .6rem; right: .15rem; }
+.tg[data-narrow="1"] .ev { padding: .1rem .15rem 0; border-left-width: 3px; }
+.tg[data-narrow="1"] .ev-time { display: none; }
+.tg[data-narrow="1"] .dh-btn { flex-direction: column; align-items: center; gap: 0; padding: .2rem 0; }
+.tg[data-narrow="1"] .dh-wd { font-size: .62rem; }
+.tg[data-narrow="1"] .dh-num { font-size: .9rem; min-width: 1.6rem; height: 1.6rem; }
+.tg[data-narrow="1"] .bar { padding: 0 .15rem; font-size: .62rem; }
+.tg[data-narrow="1"] .bar .bar-time, .tg[data-narrow="1"] .bar .prio-ico, .tg[data-narrow="1"] .ev .prio-ico { display: none; }
+.tg[data-narrow="1"] .tg-alldayrow .tg-gutter { font-size: .55rem; }
+.tf-list { z-index: 600; }
+.tf-opt { font-variant-numeric: tabular-nums; justify-content: center; }
+.board-tools { display: flex; align-items: center; justify-content: flex-end; gap: .4rem; margin-bottom: .4rem; flex: none; }
+.board-tools .hint { margin-right: auto; }
+.board { --bz: 1; --bzc: 1; }
+.board .board-scroll { touch-action: pan-x pan-y; }
+.board .cell-cards, .board .cell-add { zoom: var(--bzc); }
+.board .board-cols, .board .lane-cells { grid-template-columns: repeat(4, minmax(calc(14rem * var(--bz)), 1fr)); }
+.board .board-grid { min-width: calc(4 * 14rem * var(--bz) + 1.8rem); }
+@media (max-width: 859px) {
+  .board .lane-cells { display: flex; }
+  .board .cell { flex: 0 0 calc(80% * var(--bz)); }
+  .board .lane-cells { touch-action: pan-x pan-y; }
+  .board .cell-head { zoom: var(--bzc); }
+}
